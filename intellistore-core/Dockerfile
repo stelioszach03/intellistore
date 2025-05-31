@@ -7,14 +7,12 @@ RUN apk add --no-cache git ca-certificates tzdata
 # Set working directory
 WORKDIR /app
 
-# Copy go mod files
+# Copy go mod files and source code
 COPY go.mod ./
+COPY . .
 
 # Download dependencies and create go.sum
 RUN go mod tidy && go mod download
-
-# Copy source code
-COPY . .
 
 # Build the application
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o intellistore-server ./cmd/server
