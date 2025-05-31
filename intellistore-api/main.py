@@ -23,24 +23,32 @@ from app.api.auth import router as auth_router
 from app.api.buckets import router as buckets_router
 from app.api.objects import router as objects_router
 from app.api.monitoring import router as monitoring_router
-from app.api.websocket import router as websocket_router
+from app.api.websocket import router as websocket_router, periodic_status_updates
 from app.core.config import get_settings
 from app.core.logging_config import setup_logging
 from app.services.kafka_service import KafkaService
 from app.services.vault_service import VaultService
 from app.services.raft_service import RaftService
 
-# Prometheus metrics
+# Prometheus metrics (clear registry to prevent duplicates)
+from prometheus_client import REGISTRY, CollectorRegistry
+import prometheus_client
+
+# Create a new registry to avoid conflicts
+CUSTOM_REGISTRY = CollectorRegistry()
+
 REQUEST_COUNT = Counter(
     'intellistore_api_requests_total',
     'Total API requests',
-    ['method', 'endpoint', 'status_code']
+    ['method', 'endpoint', 'status_code'],
+    registry=CUSTOM_REGISTRY
 )
 
 REQUEST_DURATION = Histogram(
     'intellistore_api_request_duration_seconds',
     'API request duration',
-    ['method', 'endpoint']
+    ['method', 'endpoint'],
+    registry=CUSTOM_REGISTRY
 )
 
 # Global services
@@ -109,6 +117,13 @@ async def lifespan(app: FastAPI):
         app.state.kafka_service = kafka_service
         app.state.vault_service = vault_service
         app.state.raft_service = raft_service
+        
+        # Start background tasks
+        try:
+            asyncio.create_task(periodic_status_updates())
+            logger.info("Background tasks started")
+        except Exception as e:
+            logger.warning("Failed to start background tasks", error=str(e))
         
         logger.info("Service initialization complete")
         
@@ -222,7 +237,7 @@ def create_app() -> FastAPI:
     async def metrics():
         """Prometheus metrics endpoint"""
         return Response(
-            generate_latest(),
+            generate_latest(CUSTOM_REGISTRY),
             media_type=CONTENT_TYPE_LATEST
         )
     

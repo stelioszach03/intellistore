@@ -43,7 +43,7 @@ if not exist "logs" mkdir logs
 REM Start Core Server
 if exist "intellistore-core" (
     echo ✓ Starting Core Server...
-    start "IntelliStore Core Server" /D "intellistore-core" bin\server.exe
+    start "IntelliStore Core Server" /D "intellistore-core" bin\server.exe -id node1 -raft-addr 127.0.0.1:5004 -data-dir .\data -http-addr 0.0.0.0:8001 -metrics-addr 0.0.0.0:9101
     timeout /t 2 /nobreak >nul
 )
 
@@ -64,7 +64,7 @@ if exist "intellistore-ml" (
 REM Start Tier Controller
 if exist "intellistore-tier-controller" (
     echo ✓ Starting Tier Controller...
-    start "IntelliStore Tier Controller" /D "intellistore-tier-controller" bin\tier-controller.exe
+    start "IntelliStore Tier Controller" /D "intellistore-tier-controller" bin\simple_tier_controller.exe
     timeout /t 2 /nobreak >nul
 )
 
@@ -82,9 +82,9 @@ echo.
 echo 🎉 IntelliStore started successfully!
 echo.
 echo 📍 Access points:
-echo   • Frontend: http://localhost:51017
-echo   • API: http://localhost:8000
-echo   • API Docs: http://localhost:8000/docs
+echo   • Frontend: http://localhost:56724
+echo   • API: http://localhost:8092
+echo   • API Docs: http://localhost:8092/docs
 echo.
 echo 💡 Use 'start.bat stop' to stop all services
 echo 💡 Use 'start.bat status' to check service status

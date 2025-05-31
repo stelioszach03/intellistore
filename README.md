@@ -75,7 +75,7 @@ That's it! 🎉 IntelliStore will start all components automatically.
 
 Once started, you can access:
 
-- **Frontend Dashboard**: http://localhost:51017
+- **Frontend Dashboard**: http://localhost:56724
 - **API Documentation**: http://localhost:8000/docs
 - **API Endpoint**: http://localhost:8000
 - **ML Service**: http://localhost:8002
@@ -227,7 +227,7 @@ DEBUG=true
 JWT_SECRET=your-secret-key-here
 
 # CORS Origins
-ALLOWED_ORIGINS=http://localhost:51017,http://localhost:3000
+ALLOWED_ORIGINS=http://localhost:56724,http://localhost:3000
 
 # Storage Configuration
 DATA_SHARDS=6
@@ -243,7 +243,7 @@ HOT_THRESHOLD=0.8
 
 | Component | Default Port | Description |
 |-----------|--------------|-------------|
-| Frontend | 51017 | Web dashboard |
+| Frontend | 56724 | Web dashboard |
 | API Server | 8000 | REST API |
 | Core Storage | 8001 | Storage engine |
 | ML Service | 8002 | ML predictions |

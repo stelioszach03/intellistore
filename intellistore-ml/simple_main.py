@@ -13,6 +13,10 @@ import logging
 import numpy as np
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 from pydantic import BaseModel, Field
 import uvicorn
 

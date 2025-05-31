@@ -8,10 +8,20 @@ import time
 from typing import Dict, Any, List, Optional
 
 import structlog
-from kafka import KafkaProducer, KafkaConsumer
-from kafka.errors import KafkaError
 
 logger = structlog.get_logger(__name__)
+
+# Optional Kafka imports
+try:
+    from kafka import KafkaProducer, KafkaConsumer
+    from kafka.errors import KafkaError
+    KAFKA_AVAILABLE = True
+except ImportError:
+    logger.warning("Kafka not available - running without Kafka support")
+    KAFKA_AVAILABLE = False
+    KafkaProducer = None
+    KafkaConsumer = None
+    KafkaError = Exception
 
 
 class KafkaService:
@@ -24,9 +34,15 @@ class KafkaService:
         self.migration_topic = "tier-migrations"
         self.producer = None
         self._initialized = False
+        self.kafka_available = KAFKA_AVAILABLE
     
     async def initialize(self):
         """Initialize Kafka producer"""
+        if not self.kafka_available:
+            logger.warning("Kafka not available - skipping Kafka initialization")
+            self._initialized = True
+            return
+            
         try:
             # Create Kafka producer
             self.producer = KafkaProducer(
@@ -53,6 +69,10 @@ class KafkaService:
         """Publish access log event to Kafka"""
         if not self._initialized:
             raise Exception("Kafka service not initialized")
+        
+        if not self.kafka_available:
+            logger.debug("Kafka not available - access log not published", event=event)
+            return
         
         try:
             # Add common fields
@@ -94,6 +114,10 @@ class KafkaService:
         if not self._initialized:
             raise Exception("Kafka service not initialized")
         
+        if not self.kafka_available:
+            logger.debug("Kafka not available - tiering request not published", event=event)
+            return
+        
         try:
             # Add common fields
             event.update({
@@ -133,6 +157,10 @@ class KafkaService:
         """Publish tier migration request to Kafka"""
         if not self._initialized:
             raise Exception("Kafka service not initialized")
+        
+        if not self.kafka_available:
+            logger.debug("Kafka not available - tier migration request not published", event=event)
+            return
         
         try:
             # Add common fields
@@ -175,6 +203,10 @@ class KafkaService:
         """Publish notification event for WebSocket clients"""
         if not self._initialized:
             raise Exception("Kafka service not initialized")
+        
+        if not self.kafka_available:
+            logger.debug("Kafka not available - notification not published", event=event)
+            return
         
         try:
             # Add common fields

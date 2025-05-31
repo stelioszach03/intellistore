@@ -423,5 +423,4 @@ async def periodic_status_updates():
             logger.error("Error sending periodic status update", error=str(e))
 
 
-# Start background task when module is imported
-asyncio.create_task(periodic_status_updates())
+# Background task will be started by FastAPI startup event

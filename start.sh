@@ -111,9 +111,9 @@ stop_all() {
     # Also kill by process name patterns
     pkill -f "intellistore-server" 2>/dev/null || true
     pkill -f "intellistore-client" 2>/dev/null || true
-    pkill -f "tier-controller" 2>/dev/null || true
+    pkill -f "simple_tier_controller" 2>/dev/null || true
     pkill -f "uvicorn.*main:app" 2>/dev/null || true
-    pkill -f "vite.*--port.*51017" 2>/dev/null || true
+    pkill -f "vite.*--port.*56724" 2>/dev/null || true
     
     print_success "All components stopped"
 }
@@ -126,10 +126,10 @@ show_status() {
     # Check each component
     local components=(
         "Core Server:8001"
-        "API Server:8000"
-        "ML Service:8002"
-        "Frontend:51017"
-        "Tier Controller:8003"
+        "API Server:8092"
+        "ML Service:8093"
+        "Frontend:56724"
+        "Tier Controller:8094"
     )
     
     for component_info in "${components[@]}"; do
@@ -160,22 +160,22 @@ case "${1:-start}" in
         
         # Start Core Server
         if [ -d "intellistore-core" ]; then
-            start_component "core-server" "cd intellistore-core && ./bin/server" 8001
+            start_component "core-server" "cd intellistore-core && ./bin/server -id node1 -raft-addr 127.0.0.1:5004 -data-dir ./data -http-addr 0.0.0.0:8001 -metrics-addr 0.0.0.0:9101" 8001
         fi
         
         # Start API Server
         if [ -d "intellistore-api" ]; then
-            start_component "api-server" "cd intellistore-api && ./venv/bin/python main.py" 8000
+            start_component "api-server" "cd intellistore-api && ./venv/bin/python main.py" 8092
         fi
         
         # Start ML Service
         if [ -d "intellistore-ml" ]; then
-            start_component "ml-service" "cd intellistore-ml && ./venv/bin/python simple_main.py" 8002
+            start_component "ml-service" "cd intellistore-ml && ./venv/bin/python simple_main.py" 8093
         fi
         
         # Start Tier Controller
         if [ -d "intellistore-tier-controller" ]; then
-            start_component "tier-controller" "cd intellistore-tier-controller && ./bin/tier-controller" 8003
+            start_component "tier-controller" "cd intellistore-tier-controller && ./bin/simple_tier_controller" 8094
         fi
         
         # Wait a bit for backend services to start
@@ -183,16 +183,16 @@ case "${1:-start}" in
         
         # Start Frontend
         if [ -d "intellistore-frontend" ]; then
-            start_component "frontend" "cd intellistore-frontend && npm run dev" 51017
+            start_component "frontend" "cd intellistore-frontend && npm run dev" 56724
         fi
         
         echo
         print_success "🎉 IntelliStore started successfully!"
         echo
         print_status "Access points:"
-        echo "  • Frontend: http://localhost:51017"
-        echo "  • API: http://localhost:8000"
-        echo "  • API Docs: http://localhost:8000/docs"
+        echo "  • Frontend: http://localhost:56724"
+        echo "  • API: http://localhost:8092"
+        echo "  • API Docs: http://localhost:8092/docs"
         echo
         print_status "Logs are available in the 'logs/' directory"
         print_status "Use './start.sh stop' to stop all services"

@@ -26,13 +26,14 @@ import (
 
 func main() {
 	var (
-		mode     = flag.String("mode", "raft", "server mode: raft | storage")
-		nodeID   = flag.String("id", "", "unique node ID")
-		dataDir  = flag.String("data-dir", "/var/lib/intellistore", "storage data directory")
-		raftAddr = flag.String("raft-addr", "0.0.0.0:5000", "address for Raft RPC")
-		httpAddr = flag.String("http-addr", "0.0.0.0:8080", "address for HTTP API")
-		joinAddr = flag.String("join", "", "address of existing cluster member to join")
-		tier     = flag.String("tier", "ssd", "storage tier: ssd | hdd")
+		mode        = flag.String("mode", "raft", "server mode: raft | storage")
+		nodeID      = flag.String("id", "", "unique node ID")
+		dataDir     = flag.String("data-dir", "/var/lib/intellistore", "storage data directory")
+		raftAddr    = flag.String("raft-addr", "127.0.0.1:5000", "address for Raft RPC")
+		httpAddr    = flag.String("http-addr", "0.0.0.0:8080", "address for HTTP API")
+		metricsAddr = flag.String("metrics-addr", "0.0.0.0:9100", "address for metrics endpoint")
+		joinAddr    = flag.String("join", "", "address of existing cluster member to join")
+		tier        = flag.String("tier", "ssd", "storage tier: ssd | hdd")
 	)
 	flag.Parse()
 
@@ -50,7 +51,7 @@ func main() {
 
 	switch *mode {
 	case "raft":
-		if err := runRaftNode(*nodeID, *dataDir, *raftAddr, *joinAddr, logger); err != nil {
+		if err := runRaftNode(*nodeID, *dataDir, *raftAddr, *joinAddr, *httpAddr, *metricsAddr, logger); err != nil {
 			logger.Fatal("Failed to run Raft node", zap.Error(err))
 		}
 	case "storage":
@@ -63,7 +64,7 @@ func main() {
 	}
 }
 
-func runRaftNode(nodeID, dataDir, raftAddr, joinAddr string, logger *zap.Logger) error {
+func runRaftNode(nodeID, dataDir, raftAddr, joinAddr, httpAddr, metricsAddr string, logger *zap.Logger) error {
 	logger.Info("Starting Raft metadata node",
 		zap.String("nodeID", nodeID),
 		zap.String("dataDir", dataDir),
@@ -144,12 +145,12 @@ func runRaftNode(nodeID, dataDir, raftAddr, joinAddr string, logger *zap.Logger)
 	router.Handle("/metrics", promhttp.Handler())
 
 	httpServer := &http.Server{
-		Addr:    ":8080",
+		Addr:    httpAddr,
 		Handler: router,
 	}
 
 	go func() {
-		logger.Info("Starting HTTP API server", zap.String("addr", ":8080"))
+		logger.Info("Starting HTTP API server", zap.String("addr", httpAddr))
 		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			logger.Error("HTTP server error", zap.Error(err))
 		}
@@ -159,8 +160,8 @@ func runRaftNode(nodeID, dataDir, raftAddr, joinAddr string, logger *zap.Logger)
 	go func() {
 		metricsRouter := mux.NewRouter()
 		metricsRouter.Handle("/metrics", promhttp.Handler())
-		logger.Info("Starting metrics server", zap.String("addr", ":9100"))
-		if err := http.ListenAndServe(":9100", metricsRouter); err != nil {
+		logger.Info("Starting metrics server", zap.String("addr", metricsAddr))
+		if err := http.ListenAndServe(metricsAddr, metricsRouter); err != nil {
 			logger.Error("Metrics server error", zap.Error(err))
 		}
 	}()
