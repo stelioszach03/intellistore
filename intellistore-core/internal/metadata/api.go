@@ -357,10 +357,9 @@ func (a *API) handleListObjects(w http.ResponseWriter, r *http.Request) {
 
 func (a *API) handleClusterStatus(w http.ResponseWriter, r *http.Request) {
 	status := map[string]interface{}{
-		"state":       a.raft.State().String(),
-		"leader":      string(a.raft.Leader()),
-		"lastIndex":   a.raft.LastIndex(),
-		"commitIndex": a.raft.CommitIndex(),
+		"state":        a.raft.State().String(),
+		"leader":       string(a.raft.Leader()),
+		"lastIndex":    a.raft.LastIndex(),
 		"appliedIndex": a.raft.AppliedIndex(),
 	}
 
