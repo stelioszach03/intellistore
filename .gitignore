@@ -75,10 +75,20 @@ logs/
 *.tmp
 *.temp
 
-# Go binaries
+# Go binaries and build artifacts
 intellistore-core/intellistore-core
+intellistore-core/intellistore-server
+intellistore-core/intellistore-client
+intellistore-core/bin/
+intellistore-core/data/
 intellistore-tier-controller/intellistore-tier-controller
+intellistore-tier-controller/tier-controller
+intellistore-tier-controller/bin/
 
 # Downloaded files
 *.tar.gz
 *.zip
+
+# Runtime data
+logs/
+*.pid
