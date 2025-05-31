@@ -241,10 +241,11 @@ services:
       - "9122:9090"
     environment:
       - KAFKA_BROKERS=kafka:9092
-      - API_BASE_URL=http://api:8000
+      - API_SERVICE_URL=http://api:8000
     depends_on:
       - kafka
       - api
+    command: ["./tier-controller", "--kafka-brokers=kafka:9092", "--api-service-url=http://api:8000"]
 
   # Frontend
   frontend:
@@ -260,6 +261,8 @@ services:
     volumes:
       - ./intellistore-frontend:/app
       - /app/node_modules
+    depends_on:
+      - api
     command: ["npm", "run", "dev"]
 
 volumes:
