@@ -6,13 +6,12 @@ import (
 	"fmt"
 	"sync"
 	"time"
+	"net/http"
+	"bytes"
 
 	"github.com/Shopify/sarama"
-	"github.com/intellistore/tier-controller/pkg/k8s"
 	"github.com/intellistore/tier-controller/pkg/metrics"
 	"github.com/sirupsen/logrus"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
 )
 
 // TieringRequest represents a request to migrate an object between tiers
@@ -45,7 +44,7 @@ type Config struct {
 type Controller struct {
 	config          *Config
 	kafkaConsumer   sarama.ConsumerGroup
-	k8sClient       kubernetes.Interface
+	httpClient      *http.Client
 	migrationQueue  chan *TieringRequest
 	workers         sync.WaitGroup
 	ctx             context.Context
@@ -68,10 +67,9 @@ func New(config *Config) (*Controller, error) {
 		return nil, fmt.Errorf("failed to create Kafka consumer: %w", err)
 	}
 
-	// Initialize Kubernetes client
-	k8sClient, err := k8s.NewClient(config.Kubeconfig)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create Kubernetes client: %w", err)
+	// Initialize HTTP client for API calls
+	httpClient := &http.Client{
+		Timeout: 30 * time.Second,
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -79,7 +77,7 @@ func New(config *Config) (*Controller, error) {
 	return &Controller{
 		config:         config,
 		kafkaConsumer:  consumer,
-		k8sClient:      k8sClient,
+		httpClient:     httpClient,
 		migrationQueue: make(chan *TieringRequest, config.Concurrency*2),
 		ctx:            ctx,
 		cancel:         cancel,
@@ -243,102 +241,49 @@ func (c *Controller) processMigrationRequest(logger *logrus.Entry, request *Tier
 		sanitizeObjectKey(request.ObjectKey), 
 		time.Now().Unix())
 
-	job, err := k8s.CreateMigrationJob(
-		jobName,
-		c.config.Namespace,
-		request.BucketName,
-		request.ObjectKey,
-		request.CurrentTier,
-		request.RecommendedTier,
-		c.config.APIServiceURL,
-	)
+	// Create migration request payload
+	migrationPayload := map[string]interface{}{
+		"bucket_name":       request.BucketName,
+		"object_key":        request.ObjectKey,
+		"current_tier":      request.CurrentTier,
+		"recommended_tier":  request.RecommendedTier,
+		"confidence":        request.Confidence,
+		"model_version":     request.ModelVersion,
+	}
+
+	payloadBytes, err := json.Marshal(migrationPayload)
 	if err != nil {
-		requestLogger.Errorf("Failed to create migration job: %v", err)
+		requestLogger.Errorf("Failed to marshal migration payload: %v", err)
 		c.metrics.MigrationJobsCreationFailed.Inc()
 		return
 	}
 
-	// Submit job to Kubernetes
-	createdJob, err := c.k8sClient.BatchV1().Jobs(c.config.Namespace).Create(
-		context.TODO(), job, metav1.CreateOptions{})
+	// Submit migration request to API
+	apiURL := fmt.Sprintf("%s/api/v1/migrate", c.config.APIServiceURL)
+	resp, err := c.httpClient.Post(apiURL, "application/json", bytes.NewBuffer(payloadBytes))
 	if err != nil {
-		requestLogger.Errorf("Failed to submit migration job: %v", err)
+		requestLogger.Errorf("Failed to submit migration request: %v", err)
+		c.metrics.MigrationJobsCreationFailed.Inc()
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusAccepted {
+		requestLogger.Errorf("Migration request failed with status: %d", resp.StatusCode)
 		c.metrics.MigrationJobsCreationFailed.Inc()
 		return
 	}
 
-	requestLogger.WithField("job_name", createdJob.Name).Info("Created migration job")
+	requestLogger.WithField("job_name", jobName).Info("Submitted migration request")
 	c.metrics.MigrationJobsCreated.Inc()
 
-	// Monitor job completion (optional - could be done by a separate controller)
-	go c.monitorMigrationJob(requestLogger, createdJob.Name, request, startTime)
+	// Record completion time
+	duration := time.Since(startTime)
+	c.metrics.MigrationJobDuration.Observe(duration.Seconds())
+	requestLogger.WithField("duration", duration).Info("Migration request completed")
 }
 
-// monitorMigrationJob monitors the completion of a migration job
-func (c *Controller) monitorMigrationJob(logger *logrus.Entry, jobName string, request *TieringRequest, startTime time.Time) {
-	timeout := time.After(c.config.MigrationTimeout)
-	ticker := time.NewTicker(10 * time.Second)
-	defer ticker.Stop()
 
-	for {
-		select {
-		case <-timeout:
-			logger.Errorf("Migration job %s timed out", jobName)
-			c.metrics.MigrationJobsTimedOut.Inc()
-			c.cleanupJob(jobName)
-			return
-
-		case <-ticker.C:
-			job, err := c.k8sClient.BatchV1().Jobs(c.config.Namespace).Get(
-				context.TODO(), jobName, metav1.GetOptions{})
-			if err != nil {
-				logger.Errorf("Failed to get job status: %v", err)
-				continue
-			}
-
-			// Check if job completed
-			if job.Status.Succeeded > 0 {
-				duration := time.Since(startTime)
-				logger.WithField("duration", duration).Info("Migration job completed successfully")
-				c.metrics.MigrationJobsSucceeded.Inc()
-				c.metrics.MigrationDuration.Observe(duration.Seconds())
-				c.cleanupJob(jobName)
-				return
-			}
-
-			// Check if job failed
-			if job.Status.Failed > 0 {
-				duration := time.Since(startTime)
-				logger.WithField("duration", duration).Error("Migration job failed")
-				c.metrics.MigrationJobsFailed.Inc()
-				c.cleanupJob(jobName)
-				return
-			}
-
-		case <-c.ctx.Done():
-			return
-		}
-	}
-}
-
-// cleanupJob removes completed migration jobs
-func (c *Controller) cleanupJob(jobName string) {
-	// Delete job after completion (with some delay to allow log collection)
-	go func() {
-		time.Sleep(5 * time.Minute)
-		
-		deletePolicy := metav1.DeletePropagationForeground
-		err := c.k8sClient.BatchV1().Jobs(c.config.Namespace).Delete(
-			context.TODO(), jobName, metav1.DeleteOptions{
-				PropagationPolicy: &deletePolicy,
-			})
-		if err != nil {
-			c.logger.Errorf("Failed to cleanup job %s: %v", jobName, err)
-		} else {
-			c.logger.Infof("Cleaned up job %s", jobName)
-		}
-	}()
-}
 
 // sanitizeObjectKey removes characters that are not valid in Kubernetes resource names
 func sanitizeObjectKey(objectKey string) string {

@@ -1,0 +1,35 @@
+{
+  "model_version": "v20250531_172655",
+  "training_date": "2025-05-31T17:26:55.699291",
+  "model_type": "SimpleTieringModel",
+  "feature_columns": [
+    "hour_of_day",
+    "day_of_week",
+    "is_weekend",
+    "is_business_hours",
+    "object_age_days",
+    "size",
+    "is_media",
+    "user_activity_level",
+    "bucket_popularity",
+    "access_count_7d",
+    "download_count_7d",
+    "unique_users_7d",
+    "avg_daily_access",
+    "last_access_hours_ago",
+    "recent_access_trend",
+    "size_category_encoded",
+    "current_tier_encoded"
+  ],
+  "evaluation_results": {
+    "auc_score": 0.85,
+    "accuracy": 0.82,
+    "precision": 0.78,
+    "recall": 0.8,
+    "f1_score": 0.79
+  },
+  "model_parameters": {
+    "type": "rule_based",
+    "description": "Simple heuristic-based model for hot/cold tiering"
+  }
+}
