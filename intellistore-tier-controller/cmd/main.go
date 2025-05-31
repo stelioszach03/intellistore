@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -32,6 +33,14 @@ var (
 func main() {
 	flag.Parse()
 
+	// Override with environment variables if set
+	if envKafkaBrokers := os.Getenv("KAFKA_BROKERS"); envKafkaBrokers != "" {
+		*kafkaBrokers = envKafkaBrokers
+	}
+	if envAPIServiceURL := os.Getenv("API_SERVICE_URL"); envAPIServiceURL != "" {
+		*apiServiceURL = envAPIServiceURL
+	}
+
 	// Configure logging
 	level, err := logrus.ParseLevel(*logLevel)
 	if err != nil {
@@ -50,9 +59,15 @@ func main() {
 	// Initialize metrics
 	metricsRegistry := metrics.NewRegistry()
 
+	// Parse Kafka brokers (support comma-separated list)
+	brokerList := strings.Split(*kafkaBrokers, ",")
+	for i, broker := range brokerList {
+		brokerList[i] = strings.TrimSpace(broker)
+	}
+
 	// Create controller configuration
 	config := &controller.Config{
-		KafkaBrokers:     []string{*kafkaBrokers},
+		KafkaBrokers:     brokerList,
 		KafkaGroupID:     *kafkaGroupID,
 		KafkaTopic:       *kafkaTopic,
 		APIServiceURL:    *apiServiceURL,

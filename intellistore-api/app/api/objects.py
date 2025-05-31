@@ -600,4 +600,117 @@ async def delete_object(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to delete object"
+
+
+class MigrationRequest(BaseModel):
+    bucket_name: str
+    object_key: str
+    current_tier: str
+    recommended_tier: str
+    confidence: float
+    model_version: str
+
+
+class MigrationResponse(BaseModel):
+    bucket_name: str
+    object_key: str
+    from_tier: str
+    to_tier: str
+    status: str
+    message: str
+
+
+@router.post("/migrate", response_model=MigrationResponse)
+async def migrate_object(
+    migration_request: MigrationRequest,
+    request: Request,
+    current_user: UserInfo = Depends(get_current_user)
+):
+    """
+    Migrate an object between storage tiers
+    """
+    logger.info("Processing migration request", 
+               bucket_name=migration_request.bucket_name,
+               object_key=migration_request.object_key,
+               current_tier=migration_request.current_tier,
+               recommended_tier=migration_request.recommended_tier,
+               confidence=migration_request.confidence)
+    
+    try:
+        # Get services from app state
+        raft_service: RaftService = request.app.state.raft_service
+        kafka_service: KafkaService = request.app.state.kafka_service
+        storage_service = StorageService(raft_service)
+        
+        # Verify object exists
+        object_metadata = await storage_service.get_object_metadata(
+            migration_request.bucket_name, 
+            migration_request.object_key
+        )
+        
+        if not object_metadata:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Object not found"
+            )
+        
+        # Check if migration is needed
+        if object_metadata.get("tier") == migration_request.recommended_tier:
+            return MigrationResponse(
+                bucket_name=migration_request.bucket_name,
+                object_key=migration_request.object_key,
+                from_tier=migration_request.current_tier,
+                to_tier=migration_request.recommended_tier,
+                status="skipped",
+                message="Object already in target tier"
+            )
+        
+        # Perform migration (simplified - in reality this would involve moving data)
+        # For now, just update the metadata
+        await storage_service.update_object_tier(
+            migration_request.bucket_name,
+            migration_request.object_key,
+            migration_request.recommended_tier
+        )
+        
+        # Log the migration event
+        access_event = {
+            "timestamp": time.time(),
+            "user_id": current_user.user_id,
+            "action": "migrate_object",
+            "bucket": migration_request.bucket_name,
+            "object": migration_request.object_key,
+            "from_tier": migration_request.current_tier,
+            "to_tier": migration_request.recommended_tier,
+            "confidence": migration_request.confidence,
+            "model_version": migration_request.model_version,
+            "success": True
+        }
+        await kafka_service.publish_access_log(access_event)
+        
+        logger.info("Object migrated successfully",
+                   bucket_name=migration_request.bucket_name,
+                   object_key=migration_request.object_key,
+                   from_tier=migration_request.current_tier,
+                   to_tier=migration_request.recommended_tier)
+        
+        return MigrationResponse(
+            bucket_name=migration_request.bucket_name,
+            object_key=migration_request.object_key,
+            from_tier=migration_request.current_tier,
+            to_tier=migration_request.recommended_tier,
+            status="completed",
+            message="Migration completed successfully"
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Failed to migrate object",
+                    bucket_name=migration_request.bucket_name,
+                    object_key=migration_request.object_key,
+                    error=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to migrate object"
         )

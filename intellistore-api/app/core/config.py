@@ -6,7 +6,7 @@ import os
 from functools import lru_cache
 from typing import List, Optional
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings
 
 
@@ -73,6 +73,14 @@ class Settings(BaseSettings):
     
     # WebSocket configuration
     websocket_heartbeat_interval: int = Field(default=30, description="WebSocket heartbeat interval")
+    
+    @field_validator('allowed_origins', 'storage_nodes', 'kafka_brokers', mode='before')
+    @classmethod
+    def parse_list_from_string(cls, v):
+        """Parse comma-separated string into list"""
+        if isinstance(v, str):
+            return [item.strip() for item in v.split(',') if item.strip()]
+        return v
     
     class Config:
         env_file = ".env"

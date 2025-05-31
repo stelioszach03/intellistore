@@ -179,6 +179,7 @@ def create_app() -> FastAPI:
     app.include_router(auth_router, prefix="/auth", tags=["Authentication"])
     app.include_router(buckets_router, prefix="/buckets", tags=["Buckets"])
     app.include_router(objects_router, prefix="/buckets", tags=["Objects"])
+    app.include_router(objects_router, prefix="/api/v1", tags=["Migration"])  # For migration endpoint
     app.include_router(monitoring_router, prefix="/monitoring", tags=["Monitoring"])
     app.include_router(websocket_router, prefix="/ws", tags=["WebSocket"])
     

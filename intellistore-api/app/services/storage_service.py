@@ -5,6 +5,7 @@ Storage service for managing shards across storage nodes
 import asyncio
 import hashlib
 import io
+import time
 from typing import Dict, Any, List, Optional, Tuple
 
 import httpx
@@ -432,6 +433,41 @@ class StorageService:
                 "status": "unhealthy",
                 "error": str(e)
             }
+    
+    async def update_object_tier(self, bucket_name: str, object_key: str, new_tier: str) -> bool:
+        """Update object tier in metadata"""
+        try:
+            logger.info("Updating object tier", 
+                       bucket=bucket_name, 
+                       object=object_key, 
+                       new_tier=new_tier)
+            
+            # Get current metadata
+            metadata = await self.get_object_metadata(bucket_name, object_key)
+            if not metadata:
+                raise Exception("Object not found")
+            
+            # Update tier in metadata
+            metadata["tier"] = new_tier
+            metadata["tier_updated_at"] = str(int(time.time()))
+            
+            # Store updated metadata via Raft
+            await self.raft_service.store_object_metadata(bucket_name, object_key, metadata)
+            
+            logger.info("Object tier updated successfully", 
+                       bucket=bucket_name, 
+                       object=object_key, 
+                       new_tier=new_tier)
+            
+            return True
+            
+        except Exception as e:
+            logger.error("Failed to update object tier", 
+                        bucket=bucket_name, 
+                        object=object_key, 
+                        new_tier=new_tier, 
+                        error=str(e))
+            raise
     
     async def close(self):
         """Close storage service"""
