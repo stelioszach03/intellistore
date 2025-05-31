@@ -1,0 +1,32 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  # - "first_rules.yml"
+  # - "second_rules.yml"
+
+scrape_configs:
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  - job_name: 'intellistore-api'
+    static_configs:
+      - targets: ['api:9090']
+
+  - job_name: 'intellistore-ml'
+    static_configs:
+      - targets: ['ml-inference:9090']
+
+  - job_name: 'intellistore-tier-controller'
+    static_configs:
+      - targets: ['tier-controller:9090']
+
+  - job_name: 'intellistore-raft-nodes'
+    static_configs:
+      - targets: ['raft-metadata-0:9100', 'raft-metadata-1:9100', 'raft-metadata-2:9100']
+
+  - job_name: 'intellistore-storage-nodes'
+    static_configs:
+      - targets: ['storage-node-0:9100', 'storage-node-1:9100', 'storage-node-2:9100']

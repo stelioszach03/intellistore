@@ -11,7 +11,7 @@ export default defineConfig({
   },
   server: {
     host: '0.0.0.0',
-    port: 54101,
+    port: 53641,
     strictPort: true,
     cors: true,
     headers: {
@@ -19,12 +19,12 @@ export default defineConfig({
     },
     proxy: {
       '/api': {
-        target: 'http://localhost:8000',
+        target: 'http://api:8000',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, ''),
       },
       '/ws': {
-        target: 'ws://localhost:8000',
+        target: 'ws://api:8000',
         ws: true,
         changeOrigin: true,
       },

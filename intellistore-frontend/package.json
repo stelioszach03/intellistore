@@ -6,6 +6,8 @@
   "dependencies": {
     "@headlessui/react": "^1.7.17",
     "@heroicons/react": "^2.0.18",
+    "@tailwindcss/forms": "^0.5.10",
+    "@tailwindcss/typography": "^0.5.16",
     "@tanstack/react-query": "^5.8.4",
     "@tanstack/react-table": "^8.10.7",
     "axios": "^1.6.2",
@@ -46,7 +48,7 @@
     "vite": "^4.5.0"
   },
   "scripts": {
-    "dev": "vite --host 0.0.0.0 --port 3000",
+    "dev": "vite --host 0.0.0.0 --port 53641",
     "build": "tsc && vite build",
     "preview": "vite preview --host 0.0.0.0 --port 3000",
     "test": "jest",

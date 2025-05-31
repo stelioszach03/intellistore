@@ -15,17 +15,6 @@ require (
 	go.uber.org/zap v1.24.0
 	google.golang.org/grpc v1.56.2
 	google.golang.org/protobuf v1.31.0
-	crypto/rand v0.0.0
-	crypto/aes v0.0.0
-	crypto/cipher v0.0.0
-	encoding/json v0.0.0
-	fmt v0.0.0
-	io v0.0.0
-	net v0.0.0
-	os v0.0.0
-	path/filepath v0.0.0
-	sync v0.0.0
-	time v0.0.0
 )
 
 require (

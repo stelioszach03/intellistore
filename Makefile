@@ -23,7 +23,7 @@ dev:
 	@echo "Starting IntelliStore development environment..."
 	docker-compose -f docker-compose.dev.yml up -d
 	@echo "Services starting up..."
-	@echo "Frontend: http://localhost:3000"
+	@echo "Frontend: http://localhost:53641"
 	@echo "API: http://localhost:8000"
 	@echo "Grafana: http://localhost:3001"
 	@echo "Vault: http://localhost:8200"
