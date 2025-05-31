@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     
     # CORS
     allowed_origins_str: str = Field(
-        default="http://localhost:56724,http://localhost:3000",
+        default="http://localhost:51090,http://localhost:3000",
         description="Allowed CORS origins (comma-separated)",
         alias="ALLOWED_ORIGINS"
     )

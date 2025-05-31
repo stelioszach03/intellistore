@@ -25,6 +25,9 @@ class APIService {
       },
     })
 
+    // Initialize token from localStorage
+    this.token = this.getStoredToken()
+
     // Request interceptor to add auth token
     this.client.interceptors.request.use(
       (config) => {
@@ -70,7 +73,18 @@ class APIService {
   // Auth endpoints
   async login(username: string, password: string): Promise<{ user: User; token: string }> {
     const response = await this.client.post('/auth/login', { username, password })
-    return response.data
+    const token = response.data.access_token
+    
+    // Set token temporarily to get user info
+    this.setToken(token)
+    
+    // Get user info
+    const userResponse = await this.client.get('/auth/me')
+    
+    return {
+      token,
+      user: userResponse.data
+    }
   }
 
   async logout(): Promise<void> {

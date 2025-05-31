@@ -81,8 +81,8 @@ start_component() {
     # Create logs directory
     mkdir -p logs
     
-    # Start the component
-    eval "$command" > "$log_file" 2>&1 &
+    # Start the component with PORT environment variable
+    PORT=$port eval "$command" > "$log_file" 2>&1 &
     local pid=$!
     echo $pid > "logs/${component}.pid"
     
@@ -113,7 +113,7 @@ stop_all() {
     pkill -f "intellistore-client" 2>/dev/null || true
     pkill -f "simple_tier_controller" 2>/dev/null || true
     pkill -f "uvicorn.*main:app" 2>/dev/null || true
-    pkill -f "vite.*--port.*56724" 2>/dev/null || true
+    pkill -f "vite.*--port.*51090" 2>/dev/null || true
     
     print_success "All components stopped"
 }
@@ -128,7 +128,7 @@ show_status() {
         "Core Server:8001"
         "API Server:8092"
         "ML Service:8093"
-        "Frontend:56724"
+        "Frontend:51090"
         "Tier Controller:8094"
     )
     
@@ -136,10 +136,41 @@ show_status() {
         local name=$(echo $component_info | cut -d: -f1)
         local port=$(echo $component_info | cut -d: -f2)
         
-        if check_port $port; then
-            echo -e "  $name: ${RED}STOPPED${NC}"
-        else
+        local is_running=false
+        
+        # Check by process name patterns
+        case $name in
+            "Core Server")
+                if pgrep -f "server.*-id.*node1" >/dev/null 2>&1; then
+                    is_running=true
+                fi
+                ;;
+            "API Server")
+                if pgrep -f "venv/bin/python main.py" >/dev/null 2>&1; then
+                    is_running=true
+                fi
+                ;;
+            "ML Service")
+                if pgrep -f "python.*simple_main.py" >/dev/null 2>&1; then
+                    is_running=true
+                fi
+                ;;
+            "Frontend")
+                if pgrep -f "vite.*--port.*51090" >/dev/null 2>&1; then
+                    is_running=true
+                fi
+                ;;
+            "Tier Controller")
+                if pgrep -f "simple_tier_controller" >/dev/null 2>&1; then
+                    is_running=true
+                fi
+                ;;
+        esac
+        
+        if [ "$is_running" = true ]; then
             echo -e "  $name: ${GREEN}RUNNING${NC} (port $port)"
+        else
+            echo -e "  $name: ${RED}STOPPED${NC}"
         fi
     done
     echo
@@ -175,7 +206,7 @@ case "${1:-start}" in
         
         # Start Tier Controller
         if [ -d "intellistore-tier-controller" ]; then
-            start_component "tier-controller" "cd intellistore-tier-controller && ./bin/simple_tier_controller" 8094
+            start_component "tier-controller" "./bin/simple_tier_controller" 8094
         fi
         
         # Wait a bit for backend services to start
@@ -183,14 +214,14 @@ case "${1:-start}" in
         
         # Start Frontend
         if [ -d "intellistore-frontend" ]; then
-            start_component "frontend" "cd intellistore-frontend && npm run dev" 56724
+            start_component "frontend" "cd intellistore-frontend && npm run dev" 51090
         fi
         
         echo
         print_success "🎉 IntelliStore started successfully!"
         echo
         print_status "Access points:"
-        echo "  • Frontend: http://localhost:56724"
+        echo "  • Frontend: http://localhost:51090"
         echo "  • API: http://localhost:8092"
         echo "  • API Docs: http://localhost:8092/docs"
         echo

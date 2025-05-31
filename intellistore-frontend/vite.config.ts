@@ -11,11 +11,15 @@ export default defineConfig({
   },
   server: {
     host: '0.0.0.0',
-    port: 56724,
+    port: 51090,
     strictPort: true,
     cors: true,
+    allowedHosts: 'all',
     headers: {
       'X-Frame-Options': 'ALLOWALL',
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': '*',
+      'Access-Control-Allow-Headers': '*',
     },
     proxy: {
       '/api': {
