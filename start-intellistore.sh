@@ -36,16 +36,31 @@ docker-compose -f docker-compose.dev.yml up -d vault kafka zookeeper
 echo "⏳ Waiting for infrastructure services to be ready..."
 sleep 30
 
-# Initialize Vault
+# Initialize Vault (skip if already initialized)
 echo "🔐 Initializing Vault..."
 docker-compose -f docker-compose.dev.yml exec vault sh -c '
     export VAULT_ADDR=http://localhost:8200
-    vault operator init -key-shares=1 -key-threshold=1 > /tmp/vault-keys.txt
-    vault operator unseal $(grep "Unseal Key 1:" /tmp/vault-keys.txt | awk "{print \$NF}")
-    export VAULT_TOKEN=$(grep "Initial Root Token:" /tmp/vault-keys.txt | awk "{print \$NF}")
-    vault auth -token=$VAULT_TOKEN
-    vault secrets enable -path=intellistore kv-v2
-    vault policy write intellistore-policy /vault/policies/intellistore-policy.hcl
+    export VAULT_TOKEN=dev-root-token
+    
+    # Check if Vault is already initialized
+    if vault status | grep -q "Initialized.*true"; then
+        echo "Vault is already initialized, skipping init..."
+        # Try to unseal if needed
+        if vault status | grep -q "Sealed.*true"; then
+            echo "Vault is sealed, attempting to unseal..."
+            # In dev mode, Vault should auto-unseal
+        fi
+    else
+        echo "Initializing Vault..."
+        vault operator init -key-shares=1 -key-threshold=1 > /tmp/vault-keys.txt
+        vault operator unseal $(grep "Unseal Key 1:" /tmp/vault-keys.txt | awk "{print \$NF}")
+        export VAULT_TOKEN=$(grep "Initial Root Token:" /tmp/vault-keys.txt | awk "{print \$NF}")
+    fi
+    
+    # Configure Vault
+    vault auth -token=$VAULT_TOKEN || true
+    vault secrets enable -path=intellistore kv-v2 || echo "KV engine already enabled"
+    vault policy write intellistore-policy /vault/policies/intellistore-policy.hcl || echo "Policy already exists"
 '
 
 # Start Raft metadata nodes
