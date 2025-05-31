@@ -61,39 +61,63 @@ async def lifespan(app: FastAPI):
     logger.info("Initializing services...")
     
     try:
-        # Initialize Vault service
-        vault_service = VaultService(
-            vault_url=settings.vault_addr,
-            vault_token=settings.vault_token
-        )
-        await vault_service.initialize()
+        # Initialize Vault service (optional)
+        if settings.vault_addr and settings.vault_token:
+            try:
+                vault_service = VaultService(
+                    vault_url=settings.vault_addr,
+                    vault_token=settings.vault_token
+                )
+                await vault_service.initialize()
+                logger.info("Vault service initialized")
+            except Exception as e:
+                logger.warning("Failed to initialize Vault service", error=str(e))
+                vault_service = None
+        else:
+            logger.info("Vault service disabled (no configuration)")
+            vault_service = None
         
-        # Initialize Raft service
-        raft_service = RaftService(
-            leader_addr=settings.raft_leader_addr,
-            storage_nodes=settings.storage_nodes
-        )
-        await raft_service.initialize()
+        # Initialize Raft service (optional)
+        try:
+            raft_service = RaftService(
+                leader_addr=settings.raft_leader_addr,
+                storage_nodes=settings.storage_nodes
+            )
+            await raft_service.initialize()
+            logger.info("Raft service initialized")
+        except Exception as e:
+            logger.warning("Failed to initialize Raft service", error=str(e))
+            raft_service = None
         
-        # Initialize Kafka service
-        kafka_service = KafkaService(
-            bootstrap_servers=settings.kafka_brokers,
-            access_logs_topic=settings.kafka_access_logs_topic
-        )
-        await kafka_service.initialize()
+        # Initialize Kafka service (optional)
+        if settings.kafka_brokers:
+            try:
+                kafka_service = KafkaService(
+                    bootstrap_servers=settings.kafka_brokers,
+                    access_logs_topic=settings.kafka_access_logs_topic
+                )
+                await kafka_service.initialize()
+                logger.info("Kafka service initialized")
+            except Exception as e:
+                logger.warning("Failed to initialize Kafka service", error=str(e))
+                kafka_service = None
+        else:
+            logger.info("Kafka service disabled (no configuration)")
+            kafka_service = None
         
         # Store services in app state
         app.state.kafka_service = kafka_service
         app.state.vault_service = vault_service
         app.state.raft_service = raft_service
         
-        logger.info("All services initialized successfully")
+        logger.info("Service initialization complete")
         
         yield
         
     except Exception as e:
-        logger.error("Failed to initialize services", error=str(e))
-        raise
+        logger.error("Critical error during service initialization", error=str(e))
+        # Don't raise - allow API to start even if some services fail
+        yield
     finally:
         # Cleanup
         logger.info("Shutting down services...")

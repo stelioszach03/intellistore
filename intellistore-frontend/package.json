@@ -48,7 +48,7 @@
     "vite": "^4.5.0"
   },
   "scripts": {
-    "dev": "vite --host 0.0.0.0 --port 53641",
+    "dev": "vite --host 0.0.0.0 --port 51017",
     "build": "tsc && vite build",
     "preview": "vite preview --host 0.0.0.0 --port 3000",
     "test": "jest",

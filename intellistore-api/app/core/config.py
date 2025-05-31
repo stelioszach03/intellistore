@@ -25,24 +25,24 @@ class Settings(BaseSettings):
     
     # CORS
     allowed_origins: List[str] = Field(
-        default=["http://localhost:3000", "http://localhost:3001"],
+        default=["http://localhost:51017", "http://localhost:3000"],
         description="Allowed CORS origins"
     )
     
-    # Vault configuration
-    vault_addr: str = Field(description="HashiCorp Vault address")
-    vault_token: str = Field(description="Vault authentication token")
+    # Vault configuration (optional for development)
+    vault_addr: Optional[str] = Field(default=None, description="HashiCorp Vault address")
+    vault_token: Optional[str] = Field(default=None, description="Vault authentication token")
     vault_mount_point: str = Field(default="intellistore", description="Vault mount point")
     
     # Raft metadata service
-    raft_leader_addr: str = Field(description="Raft leader address")
+    raft_leader_addr: str = Field(default="localhost:8001", description="Raft leader address")
     raft_timeout: int = Field(default=10, description="Raft request timeout in seconds")
     
     # Storage nodes
-    storage_nodes: List[str] = Field(description="List of storage node addresses")
+    storage_nodes: List[str] = Field(default=["localhost:8001"], description="List of storage node addresses")
     
-    # Kafka configuration
-    kafka_brokers: List[str] = Field(description="Kafka broker addresses")
+    # Kafka configuration (optional for development)
+    kafka_brokers: Optional[List[str]] = Field(default=None, description="Kafka broker addresses")
     kafka_access_logs_topic: str = Field(default="access-logs", description="Access logs topic")
     kafka_tiering_topic: str = Field(default="tiering-requests", description="Tiering requests topic")
     
@@ -66,7 +66,7 @@ class Settings(BaseSettings):
     
     # ML tiering configuration
     ml_inference_url: str = Field(
-        default="http://ml-inference:8000",
+        default="http://localhost:8002",
         description="ML inference service URL"
     )
     hot_threshold: float = Field(default=0.8, description="Hot tier prediction threshold")
