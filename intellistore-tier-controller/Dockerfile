@@ -1,8 +1,8 @@
 # Multi-stage build for IntelliStore Tier Controller
-FROM golang:1.21-alpine AS builder
+FROM golang:1.21 AS builder
 
 # Install build dependencies
-RUN apk add --no-cache git ca-certificates
+RUN apt-get update && apt-get install -y git ca-certificates && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
 WORKDIR /app
@@ -18,14 +18,14 @@ RUN go mod tidy && go mod download
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o tier-controller ./cmd/main.go
 
 # Final stage
-FROM alpine:latest
+FROM debian:bullseye-slim
 
 # Install ca-certificates for HTTPS requests
-RUN apk --no-cache add ca-certificates
+RUN apt-get update && apt-get install -y ca-certificates wget && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user
-RUN addgroup -g 1001 intellistore && \
-    adduser -D -u 1001 -G intellistore intellistore
+RUN groupadd -g 1001 intellistore && \
+    useradd -r -u 1001 -g intellistore intellistore
 
 # Set working directory
 WORKDIR /app
