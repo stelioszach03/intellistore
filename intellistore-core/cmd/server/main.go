@@ -3,18 +3,17 @@ package main
 import (
 	"flag"
 	"fmt"
-	"log"
 	"net"
 	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"syscall"
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/raft"
 	raftboltdb "github.com/hashicorp/raft-boltdb/v2"
 	"github.com/intellistore/core/internal/metadata"
@@ -73,7 +72,11 @@ func runRaftNode(nodeID, dataDir, raftAddr, joinAddr string, logger *zap.Logger)
 	// Create Raft configuration
 	cfg := raft.DefaultConfig()
 	cfg.LocalID = raft.ServerID(nodeID)
-	cfg.Logger = &raftLogger{logger}
+	cfg.Logger = hclog.New(&hclog.LoggerOptions{
+		Name:   "raft",
+		Level:  hclog.Info,
+		Output: os.Stderr,
+	})
 
 	// Create FSM (Finite State Machine)
 	fsm := metadata.NewFSM(dataDir, logger)
@@ -206,12 +209,6 @@ func runStorageNode(nodeID, dataDir, httpAddr, tier string, logger *zap.Logger) 
 
 	// Node info
 	router.HandleFunc("/info", func(w http.ResponseWriter, r *http.Request) {
-		info := map[string]interface{}{
-			"nodeID":    nodeID,
-			"tier":      tier,
-			"dataDir":   dataDir,
-			"timestamp": time.Now().Unix(),
-		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		// In a real implementation, you'd use json.Marshal
@@ -254,26 +251,7 @@ func runStorageNode(nodeID, dataDir, httpAddr, tier string, logger *zap.Logger) 
 	return server.Close()
 }
 
-// raftLogger adapts zap.Logger to raft.Logger interface
-type raftLogger struct {
-	*zap.Logger
-}
 
-func (r *raftLogger) Debug(msg string, args ...interface{}) {
-	r.Logger.Debug(fmt.Sprintf(msg, args...))
-}
-
-func (r *raftLogger) Info(msg string, args ...interface{}) {
-	r.Logger.Info(fmt.Sprintf(msg, args...))
-}
-
-func (r *raftLogger) Warn(msg string, args ...interface{}) {
-	r.Logger.Warn(fmt.Sprintf(msg, args...))
-}
-
-func (r *raftLogger) Error(msg string, args ...interface{}) {
-	r.Logger.Error(fmt.Sprintf(msg, args...))
-}
 
 func parseStorageNodes(nodesList string) []string {
 	if nodesList == "" {
