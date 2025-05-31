@@ -13,7 +13,6 @@ import (
 	"mime/multipart"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -438,7 +437,7 @@ func downloadObject(bucketName, objectKey, outputPath string) error {
 		return fmt.Errorf("failed to create encoder: %w", err)
 	}
 
-	dataShards, parityShards, totalShards := encoder.GetShardInfo()
+	dataShards, _, totalShards := encoder.GetShardInfo()
 	shardData := make([][]byte, totalShards)
 
 	for i, shardInfo := range shards {
