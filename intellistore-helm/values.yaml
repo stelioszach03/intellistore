@@ -1,0 +1,261 @@
+# Global configuration
+global:
+  imageRegistry: "ghcr.io/intellistore"
+  imagePullSecrets: []
+  storageClass: "gp2"
+  
+# API Service
+api:
+  enabled: true
+  image:
+    repository: intellistore-api
+    tag: latest
+    pullPolicy: IfNotPresent
+  replicas: 2
+  resources:
+    requests:
+      cpu: "250m"
+      memory: "512Mi"
+    limits:
+      cpu: "500m"
+      memory: "1Gi"
+  env:
+    VAULT_ADDR: "http://vault:8200"
+    JWT_SECRET_PATH: "vault://intellistore/keys/jwt-signing-key"
+    KAFKA_BROKERS: "kafka-0:9092,kafka-1:9092,kafka-2:9092"
+    RAFT_LEADER_ADDR: "raft-metadata-0.raft-metadata.svc.cluster.local:5000"
+    LOG_LEVEL: "INFO"
+  service:
+    type: ClusterIP
+    port: 8000
+  ingress:
+    enabled: true
+    className: "nginx"
+    annotations:
+      nginx.ingress.kubernetes.io/rewrite-target: /
+    hosts:
+      - host: api.intellistore.local
+        paths:
+          - path: /
+            pathType: Prefix
+    tls: []
+
+# Core Services (Raft + Storage Nodes)
+core:
+  enabled: true
+  raft:
+    image:
+      repository: intellistore-core
+      tag: latest
+      pullPolicy: IfNotPresent
+    replicas: 3
+    resources:
+      requests:
+        cpu: "200m"
+        memory: "256Mi"
+      limits:
+        cpu: "500m"
+        memory: "512Mi"
+    persistence:
+      enabled: true
+      size: "10Gi"
+      storageClass: ""
+    service:
+      type: ClusterIP
+      port: 5000
+  
+  storageNode:
+    image:
+      repository: intellistore-core
+      tag: latest
+      pullPolicy: IfNotPresent
+    replicas: 6
+    resources:
+      requests:
+        cpu: "500m"
+        memory: "1Gi"
+      limits:
+        cpu: "1"
+        memory: "2Gi"
+    persistence:
+      enabled: true
+      size: "100Gi"
+      storageClass: ""
+    service:
+      type: ClusterIP
+      port: 8080
+    tiers:
+      ssd:
+        replicas: 3
+        storageClass: "gp3-ssd"
+      hdd:
+        replicas: 3
+        storageClass: "sc-standard-hdd"
+
+# ML Inference Service
+ml:
+  enabled: true
+  image:
+    repository: intellistore-ml-inference
+    tag: latest
+    pullPolicy: IfNotPresent
+  replicas: 3
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "1Gi"
+    limits:
+      cpu: "1"
+      memory: "2Gi"
+  env:
+    KAFKA_BROKERS: "kafka-0:9092,kafka-1:9092,kafka-2:9092"
+    KAFKA_TOPIC: "access-logs"
+    MODEL_PATH: "/app/model.onnx"
+    THRESHOLD: "0.8"
+  service:
+    type: ClusterIP
+    port: 8001
+
+# Tier Controller
+tierController:
+  enabled: true
+  image:
+    repository: intellistore-tier-controller
+    tag: latest
+    pullPolicy: IfNotPresent
+  replicas: 1
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "200m"
+      memory: "256Mi"
+  env:
+    KAFKA_BROKERS: "kafka-0:9092,kafka-1:9092,kafka-2:9092"
+    API_ENDPOINT: "http://intellistore-api:8000"
+    KUBECONFIG: ""
+
+# HashiCorp Vault
+vault:
+  enabled: true
+  image:
+    repository: vault
+    tag: "1.13.2"
+    pullPolicy: IfNotPresent
+  replicas: 1
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "200m"
+      memory: "256Mi"
+  persistence:
+    enabled: true
+    size: "10Gi"
+    storageClass: ""
+  config:
+    storage:
+      file:
+        path: "/vault/data"
+    listener:
+      tcp:
+        address: "0.0.0.0:8200"
+        tls_disable: true
+    ui: true
+    api_addr: "http://0.0.0.0:8200"
+  service:
+    type: ClusterIP
+    port: 8200
+
+# Monitoring Stack
+monitoring:
+  enabled: true
+  prometheus:
+    enabled: true
+    retention: "15d"
+    storageSize: "50Gi"
+    resources:
+      requests:
+        cpu: "200m"
+        memory: "512Mi"
+      limits:
+        cpu: "500m"
+        memory: "1Gi"
+  grafana:
+    enabled: true
+    adminPassword: "admin123"
+    persistence:
+      enabled: true
+      size: "10Gi"
+    resources:
+      requests:
+        cpu: "100m"
+        memory: "128Mi"
+      limits:
+        cpu: "200m"
+        memory: "256Mi"
+  alertmanager:
+    enabled: true
+    persistence:
+      enabled: true
+      size: "10Gi"
+
+# Frontend
+frontend:
+  enabled: true
+  image:
+    repository: intellistore-frontend
+    tag: latest
+    pullPolicy: IfNotPresent
+  replicas: 2
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "200m"
+      memory: "256Mi"
+  service:
+    type: ClusterIP
+    port: 3000
+  ingress:
+    enabled: true
+    className: "nginx"
+    annotations:
+      nginx.ingress.kubernetes.io/rewrite-target: /
+    hosts:
+      - host: intellistore.local
+        paths:
+          - path: /
+            pathType: Prefix
+    tls: []
+
+# External Dependencies
+kafka:
+  enabled: true
+  replicas: 3
+  persistence:
+    enabled: true
+    size: "20Gi"
+  zookeeper:
+    enabled: true
+    replicas: 3
+    persistence:
+      enabled: true
+      size: "10Gi"
+
+# Network Policies
+networkPolicy:
+  enabled: false
+
+# Pod Security Policy
+podSecurityPolicy:
+  enabled: false
+
+# Service Monitor for Prometheus
+serviceMonitor:
+  enabled: true
+  interval: 30s
+  scrapeTimeout: 10s

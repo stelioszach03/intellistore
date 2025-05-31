@@ -1,0 +1,51 @@
+apiVersion: v2
+name: intellistore
+description: AI-Driven Cloud-Native Distributed Object Storage
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+home: https://github.com/intellistore/intellistore
+sources:
+  - https://github.com/intellistore/intellistore
+maintainers:
+  - name: IntelliStore Team
+    email: team@intellistore.dev
+keywords:
+  - storage
+  - distributed
+  - ai
+  - ml
+  - object-storage
+  - raft
+  - erasure-coding
+dependencies:
+  - name: api
+    version: "0.1.0"
+    repository: "file://./charts/api"
+    condition: api.enabled
+  - name: core
+    version: "0.1.0"
+    repository: "file://./charts/core"
+    condition: core.enabled
+  - name: ml
+    version: "0.1.0"
+    repository: "file://./charts/ml"
+    condition: ml.enabled
+  - name: tier-controller
+    version: "0.1.0"
+    repository: "file://./charts/tier-controller"
+    condition: tierController.enabled
+  - name: vault
+    version: "0.1.0"
+    repository: "file://./charts/vault"
+    condition: vault.enabled
+  - name: monitoring
+    version: "0.1.0"
+    repository: "file://./charts/monitoring"
+    condition: monitoring.enabled
+  - name: frontend
+    version: "0.1.0"
+    repository: "file://./charts/frontend"
+    condition: frontend.enabled
+annotations:
+  category: Storage

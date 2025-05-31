@@ -1,0 +1,308 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  release:
+    types: [ published ]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  lint-and-test:
+    name: Lint and Test
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+        
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: intellistore-frontend/package-lock.json
+        
+    - name: Install dependencies
+      run: |
+        # Go dependencies
+        cd intellistore-core && go mod download
+        cd ../intellistore-tier-controller && go mod download
+        
+        # Python dependencies
+        cd ../intellistore-api && pip install -r requirements.txt
+        cd ../intellistore-ml && pip install -r requirements.txt
+        
+        # Node.js dependencies
+        cd ../intellistore-frontend && npm ci
+        
+    - name: Lint Go code
+      run: |
+        cd intellistore-core && golangci-lint run
+        cd ../intellistore-tier-controller && golangci-lint run
+        
+    - name: Lint Python code
+      run: |
+        cd intellistore-api && flake8 . && black --check .
+        cd ../intellistore-ml && flake8 . && black --check .
+        
+    - name: Lint Frontend code
+      run: |
+        cd intellistore-frontend && npm run lint
+        
+    - name: Test Go code
+      run: |
+        cd intellistore-core && go test -v ./...
+        cd ../intellistore-tier-controller && go test -v ./...
+        
+    - name: Test Python code
+      run: |
+        cd intellistore-api && pytest
+        cd ../intellistore-ml && pytest
+        
+    - name: Test Frontend code
+      run: |
+        cd intellistore-frontend && npm test -- --coverage --watchAll=false
+        
+    - name: Lint Helm charts
+      run: |
+        helm lint intellistore-helm/
+        helm lint intellistore-helm/charts/*/
+        
+    - name: Validate Terraform
+      run: |
+        cd intellistore-iac
+        terraform fmt -check -recursive
+        find . -name "*.tf" -exec terraform validate {} \;
+        
+    - name: Security scan with Checkov
+      uses: bridgecrewio/checkov-action@master
+      with:
+        directory: intellistore-iac/
+        framework: terraform
+        
+    - name: Security scan with Trivy
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+
+  build-and-push:
+    name: Build and Push Images
+    runs-on: ubuntu-latest
+    needs: lint-and-test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    strategy:
+      matrix:
+        component:
+          - name: core
+            context: intellistore-core
+            dockerfile: intellistore-core/Dockerfile
+          - name: api
+            context: intellistore-api
+            dockerfile: intellistore-api/Dockerfile
+          - name: ml-inference
+            context: intellistore-ml
+            dockerfile: intellistore-ml/Dockerfile
+          - name: tier-controller
+            context: intellistore-tier-controller
+            dockerfile: intellistore-tier-controller/Dockerfile
+          - name: frontend
+            context: intellistore-frontend
+            dockerfile: intellistore-frontend/Dockerfile
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ github.repository }}-${{ matrix.component.name }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=sha,prefix={{branch}}-
+          type=raw,value=latest,enable={{is_default_branch}}
+          
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: ${{ matrix.component.context }}
+        file: ${{ matrix.component.dockerfile }}
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+  integration-test:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up k3d cluster
+      run: |
+        curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
+        k3d cluster create intellistore-test --port "8080:80@loadbalancer"
+        
+    - name: Install Helm
+      uses: azure/setup-helm@v3
+      
+    - name: Deploy IntelliStore
+      run: |
+        # Add required Helm repositories
+        helm repo add bitnami https://charts.bitnami.com/bitnami
+        helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+        helm repo update
+        
+        # Deploy dependencies
+        helm install kafka bitnami/kafka --wait
+        helm install vault ./intellistore-vault-config/helm --wait
+        
+        # Deploy IntelliStore
+        helm install intellistore ./intellistore-helm --wait
+        
+    - name: Run integration tests
+      run: |
+        # Wait for services to be ready
+        kubectl wait --for=condition=ready pod -l app=intellistore-api --timeout=300s
+        kubectl wait --for=condition=ready pod -l app=intellistore-core --timeout=300s
+        
+        # Run basic smoke tests
+        kubectl port-forward svc/intellistore-api 8000:8000 &
+        sleep 10
+        
+        # Test API health
+        curl -f http://localhost:8000/health
+        
+        # Test basic upload/download flow
+        cd intellistore-core
+        go run cmd/client/main.go --api-url http://localhost:8000 login --username test --password test
+        echo "test content" > test.txt
+        go run cmd/client/main.go --api-url http://localhost:8000 upload --bucket test-bucket --key test.txt --file test.txt
+        go run cmd/client/main.go --api-url http://localhost:8000 download --bucket test-bucket --key test.txt --output downloaded.txt
+        diff test.txt downloaded.txt
+
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: integration-test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    environment: staging
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: us-west-2
+        
+    - name: Deploy infrastructure
+      run: |
+        cd intellistore-iac/environments/staging/aws
+        terraform init
+        terraform plan
+        terraform apply -auto-approve
+        
+    - name: Update kubeconfig
+      run: |
+        aws eks update-kubeconfig --region us-west-2 --name intellistore-staging
+        
+    - name: Deploy application
+      run: |
+        helm upgrade --install intellistore ./intellistore-helm \
+          --namespace intellistore \
+          --create-namespace \
+          --values ./intellistore-helm-values/values.staging.yaml \
+          --wait
+
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: deploy-staging
+    if: github.event_name == 'release' && github.event.action == 'published'
+    environment: production
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: us-west-2
+        
+    - name: Deploy infrastructure
+      run: |
+        cd intellistore-iac/environments/prod/aws
+        terraform init
+        terraform plan
+        terraform apply -auto-approve
+        
+    - name: Update kubeconfig
+      run: |
+        aws eks update-kubeconfig --region us-west-2 --name intellistore-prod
+        
+    - name: Deploy application
+      run: |
+        helm upgrade --install intellistore ./intellistore-helm \
+          --namespace intellistore \
+          --create-namespace \
+          --values ./intellistore-helm-values/values.production.yaml \
+          --wait
+          
+    - name: Run smoke tests
+      run: |
+        # Wait for deployment to be ready
+        kubectl wait --for=condition=ready pod -l app=intellistore-api --timeout=600s
+        
+        # Run production smoke tests
+        API_URL=$(kubectl get ingress intellistore-api -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+        curl -f https://$API_URL/health
+        
+    - name: Notify deployment
+      uses: 8398a7/action-slack@v3
+      with:
+        status: ${{ job.status }}
+        channel: '#deployments'
+        webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+      if: always()
