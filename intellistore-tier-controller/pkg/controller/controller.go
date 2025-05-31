@@ -279,7 +279,7 @@ func (c *Controller) processMigrationRequest(logger *logrus.Entry, request *Tier
 
 	// Record completion time
 	duration := time.Since(startTime)
-	c.metrics.MigrationJobDuration.Observe(duration.Seconds())
+	c.metrics.MigrationDuration.Observe(duration.Seconds())
 	requestLogger.WithField("duration", duration).Info("Migration request completed")
 }
 
