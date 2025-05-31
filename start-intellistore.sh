@@ -30,7 +30,7 @@ docker-compose -f docker-compose.dev.yml build --no-cache
 
 # Start infrastructure services first (Vault, Kafka, etc.)
 echo "🏗️  Starting infrastructure services..."
-docker-compose -f docker-compose.dev.yml up -d vault kafka zookeeper redis postgres
+docker-compose -f docker-compose.dev.yml up -d vault kafka zookeeper
 
 # Wait for infrastructure to be ready
 echo "⏳ Waiting for infrastructure services to be ready..."
