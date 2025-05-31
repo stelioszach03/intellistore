@@ -11,6 +11,7 @@ import (
 	"github.com/intellistore/tier-controller/pkg/k8s"
 	"github.com/intellistore/tier-controller/pkg/metrics"
 	"github.com/sirupsen/logrus"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
 
@@ -366,8 +367,3 @@ func sanitizeObjectKey(objectKey string) string {
 	
 	return result
 }
-
-// Import required packages
-import (
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-)
