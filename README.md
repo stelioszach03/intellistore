@@ -59,7 +59,17 @@ python3 setup.py
 python setup.py
 ```
 
-### 3. Start IntelliStore
+### 3. Configure Environment
+
+Copy the environment template and configure your settings:
+
+```bash
+cd intellistore-api
+cp .env.example .env
+# Edit .env file and set JWT_SECRET to a secure value
+```
+
+### 4. Start IntelliStore
 
 ```bash
 # On Linux/macOS
@@ -75,11 +85,12 @@ That's it! 🎉 IntelliStore will start all components automatically.
 
 Once started, you can access:
 
-- **Frontend Dashboard**: http://localhost:56724
-- **API Documentation**: http://localhost:8000/docs
-- **API Endpoint**: http://localhost:8000
-- **ML Service**: http://localhost:8002
+- **Frontend Dashboard**: http://localhost:51090
+- **API Documentation**: http://localhost:8092/docs
+- **API Endpoint**: http://localhost:8092
+- **ML Service**: http://localhost:8093
 - **Core Storage**: http://localhost:8001
+- **Tier Controller**: http://localhost:8094
 
 ## 📖 Detailed Setup
 
