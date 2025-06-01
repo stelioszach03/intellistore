@@ -9,7 +9,7 @@ import {
 } from '@heroicons/react/24/outline'
 import apiService from '../services/api'
 import LoadingSpinner from '../components/LoadingSpinner'
-import { formatBytes } from '../utils/date'
+import { formatBytes } from '../services/mockData'
 
 export default function DashboardPage() {
   const { data: buckets, isLoading: bucketsLoading } = useQuery({
@@ -127,7 +127,7 @@ export default function DashboardPage() {
                   />
                 </div>
                 <p className="mt-2 text-xs font-medium text-gray-900 dark:text-white capitalize">
-                  {component}
+                  {component.replace('-', ' ')}
                 </p>
               </div>
             ))}

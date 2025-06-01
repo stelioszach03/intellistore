@@ -34,38 +34,20 @@ export function WebSocketProvider({ children }: WebSocketProviderProps) {
       return
     }
 
-    // Create socket connection
-    const newSocket = io('/ws', {
-      auth: {
-        token: localStorage.getItem('intellistore_token'),
-      },
-      transports: ['websocket'],
-    })
+    // Simulate connection for now (WebSocket server not implemented yet)
+    setIsConnected(true)
+    console.log('WebSocket simulation: connected')
 
-    newSocket.on('connect', () => {
-      console.log('WebSocket connected')
-      setIsConnected(true)
-    })
-
-    newSocket.on('disconnect', () => {
-      console.log('WebSocket disconnected')
-      setIsConnected(false)
-    })
-
-    newSocket.on('connect_error', (error) => {
-      console.error('WebSocket connection error:', error)
-      setIsConnected(false)
-    })
-
-    // Handle incoming messages
-    newSocket.on('message', (message: WebSocketMessage) => {
-      handleWebSocketMessage(message)
-    })
-
-    setSocket(newSocket)
+    // TODO: Implement actual WebSocket connection when backend supports it
+    // const newSocket = io('/ws', {
+    //   auth: {
+    //     token: localStorage.getItem('intellistore_token'),
+    //   },
+    //   transports: ['websocket'],
+    // })
 
     return () => {
-      newSocket.disconnect()
+      setIsConnected(false)
     }
   }, [isAuthenticated, user])
 

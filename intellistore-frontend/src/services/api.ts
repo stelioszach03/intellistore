@@ -11,6 +11,7 @@ import {
   SystemStatus,
   APIError
 } from '../types'
+import { mockBuckets, mockObjects, mockMetrics, mockSystemStatus } from './mockData'
 
 class APIService {
   private client: AxiosInstance
@@ -102,8 +103,13 @@ class APIService {
 
   // Bucket endpoints
   async getBuckets(): Promise<Bucket[]> {
-    const response = await this.client.get('/buckets')
-    return response.data
+    try {
+      const response = await this.client.get('/buckets')
+      return response.data
+    } catch (error) {
+      console.warn('Failed to fetch buckets from API, using mock data:', error)
+      return mockBuckets
+    }
   }
 
   async createBucket(name: string): Promise<Bucket> {
@@ -196,13 +202,23 @@ class APIService {
 
   // Metrics endpoints
   async getMetrics(): Promise<MetricsData> {
-    const response = await this.client.get('/metrics/dashboard')
-    return response.data
+    try {
+      const response = await this.client.get('/metrics/dashboard')
+      return response.data
+    } catch (error) {
+      console.warn('Failed to fetch metrics from API, using mock data:', error)
+      return mockMetrics
+    }
   }
 
   async getSystemStatus(): Promise<SystemStatus> {
-    const response = await this.client.get('/health')
-    return response.data
+    try {
+      const response = await this.client.get('/health')
+      return response.data
+    } catch (error) {
+      console.warn('Failed to fetch system status from API, using mock data:', error)
+      return mockSystemStatus
+    }
   }
 
   // Prometheus metrics (for charts)
