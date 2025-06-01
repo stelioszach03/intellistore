@@ -93,7 +93,7 @@ class Settings(BaseSettings):
         return [item.strip() for item in self.kafka_brokers_str.split(',') if item.strip()]
     
     model_config = {
-        "env_file": ".env",
+        "env_file": [".env", ".env.development"],
         "env_file_encoding": "utf-8",
         "case_sensitive": False,
         "extra": "ignore",
